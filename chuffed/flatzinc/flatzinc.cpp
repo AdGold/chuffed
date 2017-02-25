@@ -190,14 +190,21 @@ namespace FlatZinc {
 		}
 	}
 
-    PriorityBranchGroup* FlatZincSpace::priorityBranch(vec<Branching*> x, AST::Array* ann, VarBranch var_branch) {
+    BranchGroup* FlatZincSpace::priorityBranch(vec<Branching*> x, AST::Array* ann, VarBranch var_branch) {
         if (x.size() != ann->a.size()) {
             fprintf(stderr, "priority branch: vars and annotation arrays must be the same length");
             return NULL;
         }
-        PriorityBranchGroup * pbg = new PriorityBranchGroup(x, var_branch);
-        parseSolveAnn(ann, pbg);
-        return pbg;
+        vec<Branching*> pbgs;
+        for (int i = 0; i < x.size(); i++) {
+            vec<Branching*> anns;
+            AST::Array *arr = new AST::Array(ann->a[i]);
+            parseGetAnns(arr, &anns);
+            BranchGroup *ibg = new BranchGroup(anns, VAR_INORDER);
+            pbgs.push(new PriorityBranchGroup(ibg, x[i]));
+        }
+        BranchGroup *bg = new BranchGroup(pbgs, var_branch);
+        return bg;
     }
 
 	void flattenAnnotations(AST::Array* ann, std::vector<AST::Node*>& out) {
@@ -217,10 +224,14 @@ namespace FlatZinc {
 	// Users should add search annotation with (core vars, default, default) even if they know nothing
     
     void FlatZincSpace::parseSolveAnn(AST::Array* ann) {
-        parseSolveAnn(ann, engine.branching);
+        vec<Branching*> anns;
+        parseGetAnns(ann, &anns);
+        for (int i = 0; i < anns.size(); i++) {
+            engine.branching->add(anns[i]);
+        }
     }
 
-	void FlatZincSpace::parseSolveAnn(AST::Array* ann, BranchGroup *branching) {
+	void FlatZincSpace::parseGetAnns(AST::Array* ann, vec<Branching*> *anns) {
 		bool hadSearchAnnotation = false;
 		if (ann) {
 			std::vector<AST::Node*> flatAnn;
@@ -237,7 +248,7 @@ namespace FlatZinc {
 						if (v->isFixed()) continue;
 						va.push(v);
 					}
-					branching->add(branch(va, ann2ivarsel(args->a[1]), ann2ivalsel(args->a[2])));
+					anns->push(branch(va, ann2ivarsel(args->a[1]), ann2ivalsel(args->a[2])));
 					if (AST::String* s = dynamic_cast<AST::String*>(args->a[3])) {
 						if (s->s == "all") so.nof_solutions = 0;
 					}
@@ -251,7 +262,7 @@ namespace FlatZinc {
 						vec<Branching*> va(vars->a.size());
 						for (int i=vars->a.size(); i--; )
 							va[i] = new BoolView(bv[vars->a[i]->getBoolVar()]);
-						branching->add(branch(va, ann2ivarsel(args->a[1]), ann2ivalsel(args->a[2]))); 
+						anns->push(branch(va, ann2ivarsel(args->a[1]), ann2ivalsel(args->a[2]))); 
 						if (AST::String* s = dynamic_cast<AST::String*>(args->a[3])) {
 							if (s->s == "all") so.nof_solutions = 0;
 						}
@@ -266,7 +277,7 @@ namespace FlatZinc {
                             vec<Branching*> va(vars->a.size());
                             for (int i=0; i < vars->a.size(); i++)
                                 va[i] = iv[vars->a[i]->getIntVar()];
-                            branching->add(priorityBranch(va, annotations, ann2ivarsel(args->a[2])));
+                            anns->push(priorityBranch(va, annotations, ann2ivarsel(args->a[2])));
                             if (AST::String* s = dynamic_cast<AST::String*>(args->a[3])) {
                                 if (s->s == "all") so.nof_solutions = 0;
                             }

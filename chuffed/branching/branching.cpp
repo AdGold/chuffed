@@ -89,61 +89,17 @@ BranchGroup* branch(vec<Branching*> x, VarBranch var_branch, ValBranch val_branc
 }
 
 
-PriorityBranchGroup::PriorityBranchGroup(vec<Branching*>& x, VarBranch vb) :
-	decisionVars(x), var_branch(vb), fin(0), cur(-1) {}
+PriorityBranchGroup::PriorityBranchGroup(Branching* x, Branching* priority) :
+	x(x), priority(priority) {}
 
 bool PriorityBranchGroup::finished() {
-	if (fin) return true;
-	for (int i = 0; i < annotations.size(); i++) {
-		if (!annotations[i]->finished()) return false;
-	}
-	fin = 1;
-	return true;
+	return x->finished();
 }
 
 double PriorityBranchGroup::getScore(VarBranch vb) {
-	double sum = 0;
-	for (int i = 0; i < decisionVars.size(); i++) {
-		sum += decisionVars[i]->getScore(vb);
-	}
-	return sum / decisionVars.size();
+    return priority->getScore(vb);
 }
 
 DecInfo* PriorityBranchGroup::branch() {
-	// If we're working on a group and it's not finished, continue there
-	if (cur >= 0 && !annotations[cur]->finished()) return annotations[cur]->branch();
-
-
-	// Need to find new group
-	if (var_branch == VAR_INORDER) {
-		int i = 0;
-		while (i < annotations.size() && annotations[i]->finished()) i++;
-		if (i == annotations.size()) {
-			return NULL;
-		}
-		if (!terminal) cur = i;
-		return annotations[i]->branch();
-	}
-
-	double best = -1e100;
-	moves.clear();
-	for (int i = 0; i < annotations.size(); i++) {
-		if (annotations[i]->finished()) continue;
-		double s = decisionVars[i]->getScore(var_branch);
-		if (s >= best) {
-			if (s > best) {
-				best = s;
-				moves.clear();
-			}
-			moves.push(i);
-		}
-	}
-	if (moves.size() == 0) {
-		return NULL;
-	}
-	int best_i = moves[0];
-	if (so.branch_random) best_i = moves[rand()%moves.size()];
-
-	if (!terminal) cur = best_i;
-	return annotations[best_i]->branch();
+    return x->branch();
 }
